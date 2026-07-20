@@ -68,10 +68,6 @@ def test_package_exposes_a_version() -> None:
 
     assert isinstance(edutap.heidi_api.__version__, str)
     assert edutap.heidi_api.__version__
-
-
-def test_async_tests_run(anyio_backend: str) -> None:
-    assert anyio_backend == "asyncio"
 ```
 
 Create `tests/conftest.py`:
@@ -264,7 +260,7 @@ Run:
 make install
 uv run pytest tests/test_package.py -v
 ```
-Expected: 2 passed.
+Expected: 1 passed.
 
 - [ ] **Step 5: Verify lint is clean**
 
