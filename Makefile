@@ -1,4 +1,4 @@
-.PHONY: install lint reformat test-local test-integration test-drift
+.PHONY: install lint reformat test-local test-integration test-drift docs
 
 install:
 	uv venv
@@ -21,3 +21,6 @@ test-integration:
 
 test-drift:
 	uv run pytest -m drift
+
+docs:
+	uv run sphinx-build -b html docs docs/_build/html
