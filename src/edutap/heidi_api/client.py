@@ -1,14 +1,28 @@
 """Async client for the HEIDI Cloud Service API."""
 
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
+from urllib.parse import quote
+from uuid import UUID
 
 import httpx
+from pydantic import TypeAdapter
 
 from edutap.heidi_api.auth import TokenManager
 from edutap.heidi_api.exceptions import error_from_response
-from edutap.heidi_api.models import AuthenticatedUser
+from edutap.heidi_api.models import (
+    AuthenticatedUser,
+    CreatePassOperation,
+    PassData,
+    PassOperationResponse,
+    PassTemplate,
+    WalletType,
+)
 from edutap.heidi_api.settings import HeidiSettings
+
+_PASS_LIST = TypeAdapter(list[PassData])
+_TEMPLATE_LIST = TypeAdapter(list[PassTemplate])
+_WALLET_TYPE_LIST = TypeAdapter(list[WalletType])
 
 
 class HeidiClient:
@@ -104,3 +118,86 @@ class HeidiClient:
         """Return the user the current access token belongs to."""
         response = await self._request("GET", "/security/authenticated")
         return AuthenticatedUser.model_validate(response.json())
+
+    async def get_pass(self, pass_id: UUID | str) -> PassData:
+        """Return a single pass by its identifier."""
+        response = await self._request("GET", f"/api/v1/pass/{pass_id}")
+        return PassData.model_validate(response.json())
+
+    async def update_pass(self, pass_id: UUID | str) -> PassOperationResponse:
+        """Ask HEIDI to update a pass. The update runs asynchronously."""
+        response = await self._request("PUT", f"/api/v1/pass/{pass_id}")
+        return PassOperationResponse.model_validate(response.json())
+
+    async def delete_pass(self, pass_id: UUID | str) -> PassOperationResponse:
+        """Ask HEIDI to delete a pass. The deletion runs asynchronously."""
+        response = await self._request("DELETE", f"/api/v1/pass/{pass_id}")
+        return PassOperationResponse.model_validate(response.json())
+
+    async def create_pass(
+        self,
+        *,
+        template_id: UUID | str,
+        person_id: str,
+        wallet_type: WalletType | str,
+    ) -> PassOperationResponse:
+        """Ask HEIDI to create a pass for a person from a template."""
+        operation = CreatePassOperation(
+            wallet_type=WalletType(wallet_type),
+            template_id=UUID(str(template_id)),
+            person_id=person_id,
+        )
+        response = await self._request(
+            "POST", "/api/v1/pass", json=operation.model_dump(mode="json")
+        )
+        return PassOperationResponse.model_validate(response.json())
+
+    async def get_passes(
+        self, template_id: UUID | str, person_id: str
+    ) -> list[PassData]:
+        """Return every pass a person holds for one template."""
+        response = await self._request(
+            "GET", f"/api/v1/passes/{template_id}/{quote(person_id)}"
+        )
+        return _PASS_LIST.validate_python(response.json())
+
+    async def update_passes(
+        self, template_id: UUID | str, person_id: str
+    ) -> PassOperationResponse:
+        """Ask HEIDI to update every pass a person holds for one template."""
+        response = await self._request(
+            "PUT", f"/api/v1/passes/{template_id}/{quote(person_id)}"
+        )
+        return PassOperationResponse.model_validate(response.json())
+
+    async def delete_passes(
+        self, template_id: UUID | str, person_id: str
+    ) -> PassOperationResponse:
+        """Ask HEIDI to delete every pass a person holds for one template."""
+        response = await self._request(
+            "DELETE", f"/api/v1/passes/{template_id}/{quote(person_id)}"
+        )
+        return PassOperationResponse.model_validate(response.json())
+
+    async def list_wallet_types(self) -> list[WalletType]:
+        """Return the wallet types this installation supports."""
+        response = await self._request("GET", "/api/v1/wallet_types")
+        return _WALLET_TYPE_LIST.validate_python(response.json())
+
+    async def list_pass_templates(self) -> list[PassTemplate]:
+        """Return the pass templates available to the authenticated customer."""
+        response = await self._request("GET", "/api/v1/pass_templates")
+        return _TEMPLATE_LIST.validate_python(response.json())
+
+    async def search_persons(
+        self, template_id: UUID | str, term: str
+    ) -> list[dict[str, Any]]:
+        """Search persons eligible for a template.
+
+        The API declares free-form objects here, so the raw dictionaries are
+        returned unchanged.
+        """
+        response = await self._request(
+            "GET", f"/api/v1/search_persons/{template_id}/{quote(term)}"
+        )
+        return list(response.json())
