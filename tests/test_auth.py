@@ -133,14 +133,15 @@ async def test_refresh_is_skipped_when_another_task_already_refreshed(
         async def run_refresh() -> None:
             await manager.refresh(stale)
 
-        async with anyio.create_task_group() as task_group:
-            task_group.start_soon(run_refresh)
-            task_group.start_soon(run_refresh)
-            await first_refresh_in_flight.wait()
-            # Give the second refresh() call a genuine chance to run while
-            # the first is still suspended mid-fetch.
-            await anyio.sleep(0)
-            release_first_refresh.set()
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as task_group:
+                task_group.start_soon(run_refresh)
+                task_group.start_soon(run_refresh)
+                await first_refresh_in_flight.wait()
+                # Give the second refresh() call a genuine chance to run while
+                # the first is still suspended mid-fetch.
+                await anyio.sleep(0)
+                release_first_refresh.set()
 
         assert await manager.token() == "token-2"
 
