@@ -88,23 +88,59 @@ async def test_refresh_fetches_a_new_token(
 async def test_refresh_is_skipped_when_another_task_already_refreshed(
     settings: HeidiSettings, http_client: httpx.AsyncClient
 ) -> None:
-    with respx.mock as mock:
-        route = mock.post(TOKEN_URL).mock(
-            side_effect=[
-                httpx.Response(
-                    200, json={"access_token": "token-1", "token_type": "bearer"}
-                ),
-                httpx.Response(
-                    200, json={"access_token": "token-2", "token_type": "bearer"}
-                ),
-            ]
+    """Two concurrent ``refresh()`` calls must genuinely overlap.
+
+    A mocked response that resolves without ever suspending would let the
+    first ``refresh()`` run check-then-act to completion before the second
+    one is even scheduled -- masking a missing lock. To rule that out, the
+    mocked token route's first refresh response only comes back after an
+    ``anyio.Event`` is set, forcing a real event-loop handoff while that
+    call is still inside its critical section deciding whether to fetch.
+    """
+    first_refresh_in_flight = anyio.Event()
+    release_first_refresh = anyio.Event()
+    call_count = 0
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # The initial `manager.token()` fetch, before any concurrency.
+            return httpx.Response(
+                200, json={"access_token": "token-1", "token_type": "bearer"}
+            )
+        if call_count == 2:
+            # The first of the two concurrent refresh() calls to reach the
+            # network. Suspend here for real, so the event loop is forced to
+            # run the second refresh() call (or block it on the lock) while
+            # this one is still mid-fetch.
+            first_refresh_in_flight.set()
+            await release_first_refresh.wait()
+            return httpx.Response(
+                200, json={"access_token": "token-2", "token_type": "bearer"}
+            )
+        # Only reachable if the check-then-act race was left unguarded: a
+        # second, unwanted refresh request went out.
+        return httpx.Response(
+            200, json={"access_token": "token-3", "token_type": "bearer"}
         )
+
+    with respx.mock as mock:
+        route = mock.post(TOKEN_URL).mock(side_effect=respond)
         manager = TokenManager(settings, http_client)
         stale = await manager.token()
 
+        async def run_refresh() -> None:
+            await manager.refresh(stale)
+
         async with anyio.create_task_group() as task_group:
-            task_group.start_soon(manager.refresh, stale)
-            task_group.start_soon(manager.refresh, stale)
+            task_group.start_soon(run_refresh)
+            task_group.start_soon(run_refresh)
+            await first_refresh_in_flight.wait()
+            # Give the second refresh() call a genuine chance to run while
+            # the first is still suspended mid-fetch.
+            await anyio.sleep(0)
+            release_first_refresh.set()
 
         assert await manager.token() == "token-2"
 
