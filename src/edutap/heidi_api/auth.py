@@ -3,7 +3,7 @@
 import anyio
 import httpx
 
-from edutap.heidi_api.exceptions import error_from_response
+from edutap.heidi_api.exceptions import HeidiAuthError, error_from_response
 from edutap.heidi_api.models import Token
 from edutap.heidi_api.settings import HeidiSettings
 
@@ -43,7 +43,22 @@ class TokenManager:
             return self._token
 
     async def _fetch(self) -> str:
-        """Perform the OAuth2 password grant."""
+        """Perform the OAuth2 password grant.
+
+        :raises HeidiAuthError: if ``username`` or ``password`` is not
+            configured. Settings built for pure self-service use
+            (:meth:`~edutap.heidi_api.client.HeidiClient.get_self_service_info`,
+            :meth:`~edutap.heidi_api.client.HeidiClient.create_pass_from_payload`)
+            carry no credentials, so this is raised instead of sending a
+            request with ``None`` values.
+        """
+        if self._settings.username is None or self._settings.password is None:
+            raise HeidiAuthError(
+                "Cannot obtain an access token: HEIDI_USERNAME and "
+                "HEIDI_PASSWORD are not configured. Set them, or use only "
+                "the unauthenticated self-service methods "
+                "(get_self_service_info, create_pass_from_payload)."
+            )
         response = await self._http_client.post(
             TOKEN_PATH,
             data={

@@ -20,6 +20,7 @@ from edutap.heidi_api.models import (
     PassTemplate,
     PayloadInfo,
     PayloadPass,
+    ValidationErrorDetail,
     WalletType,
 )
 from edutap.heidi_api.settings import HeidiSettings
@@ -43,6 +44,7 @@ __all__ = [
     "PassTemplate",
     "PayloadInfo",
     "PayloadPass",
+    "ValidationErrorDetail",
     "WalletType",
     "__version__",
 ]

@@ -129,6 +129,34 @@ async def test_an_injected_http_client_is_not_closed(
     await external_http_client.aclose()
 
 
+async def test_an_injected_http_client_without_base_url_fails_fast(
+    settings: HeidiSettings,
+) -> None:
+    bare_client = httpx.AsyncClient()
+
+    with pytest.raises(ValueError, match="base_url"):
+        HeidiClient(settings=settings, http_client=bare_client)
+
+    await bare_client.aclose()
+
+
+async def test_an_authenticated_method_without_credentials_raises_a_clear_error(
+    anonymous_heidi: HeidiClient, mock_api: respx.MockRouter
+) -> None:
+    """A client built for pure self-service use has no issuer credentials.
+
+    Calling one of the twelve authenticated operations on it must fail with
+    an actionable :class:`HeidiAuthError` naming the missing configuration,
+    not an opaque error from deep inside the token fetch.
+    """
+    with pytest.raises(HeidiAuthError, match="HEIDI_USERNAME|HEIDI_PASSWORD"):
+        await anonymous_heidi.whoami()
+
+    assert not any(
+        call.request.url.path == "/security/authenticated" for call in mock_api.calls
+    )
+
+
 async def test_settings_are_read_from_the_environment_by_default(
     monkeypatch: pytest.MonkeyPatch, mock_api: respx.MockRouter
 ) -> None:

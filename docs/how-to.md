@@ -6,10 +6,12 @@ Settings are read from the environment with the prefix `HEIDI_`:
 
 | Variable | Default |
 | --- | --- |
-| `HEIDI_USERNAME` | required |
-| `HEIDI_PASSWORD` | required |
+| `HEIDI_USERNAME` | none |
+| `HEIDI_PASSWORD` | none |
 | `HEIDI_BASE_URL` | `https://api.cloud.heidi-pass.com` |
 | `HEIDI_TIMEOUT` | `30.0` |
+
+`HEIDI_USERNAME` and `HEIDI_PASSWORD` are only needed for the issuer operations and for `get_self_service_payload`. A client built without them can still call `get_self_service_info` and `create_pass_from_payload` — see {doc}`reference` — but raises `HeidiAuthError` if anything else needs a token.
 
 A `.env` file in the working directory is read as well. To configure the client
 explicitly instead:
@@ -67,3 +69,5 @@ async with HeidiClient() as heidi:
 ```
 
 The payload is opaque — store and forward it unchanged.
+
+`get_self_service_info` and `create_pass_from_payload` need no issuer credentials — the payload itself is the authorization — so this flow also works from a client built with `HeidiSettings(username=None, password=None)`, e.g. in a self-service frontend that never sees issuer credentials. `get_self_service_payload` still does require credentials.

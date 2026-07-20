@@ -170,3 +170,26 @@ async def test_server_error_while_fetching_the_token_is_raised(
 
         with pytest.raises(HeidiServerError):
             await manager.token()
+
+
+async def test_fetching_a_token_without_credentials_raises_a_clear_auth_error(
+    http_client: httpx.AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Settings for pure self-service use carry no credentials.
+
+    Requesting a token from such settings must fail with an actionable
+    :class:`HeidiAuthError`, not an ``AttributeError`` on ``None`` and not a
+    request sent with ``None`` as the username/password.
+    """
+    monkeypatch.delenv("HEIDI_USERNAME", raising=False)
+    monkeypatch.delenv("HEIDI_PASSWORD", raising=False)
+    settings = HeidiSettings(base_url=BASE_URL, _env_file=None)  # type: ignore
+
+    with respx.mock(assert_all_mocked=True) as mock:
+        manager = TokenManager(settings, http_client)
+
+        with pytest.raises(HeidiAuthError, match="HEIDI_USERNAME|HEIDI_PASSWORD"):
+            await manager.token()
+
+    assert mock.calls.call_count == 0

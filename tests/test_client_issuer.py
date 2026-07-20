@@ -213,3 +213,91 @@ async def test_get_passes_person_id_with_slash_is_percent_encoded(
     assert route.called
     sent_path = route.calls[0].request.url.raw_path.decode()
     assert sent_path == f"/api/v1/passes/{TEMPLATE_ID}/dept%2F42"
+
+
+NON_UUID_IDS = [
+    "../../security/authenticated",  # path traversal via dot-segment normalisation
+    "abc?admin=1",  # query-string injection
+]
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_get_pass_rejects_a_non_uuid_pass_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.get_pass(bad_id)
+
+    assert not mock_api.calls
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_update_pass_rejects_a_non_uuid_pass_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.update_pass(bad_id)
+
+    assert not mock_api.calls
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_delete_pass_rejects_a_non_uuid_pass_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.delete_pass(bad_id)
+
+    assert not mock_api.calls
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_create_pass_rejects_a_non_uuid_template_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.create_pass(
+            template_id=bad_id, person_id=PERSON_ID, wallet_type=WalletType.APPLE
+        )
+
+    assert not mock_api.calls
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_get_passes_rejects_a_non_uuid_template_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.get_passes(bad_id, PERSON_ID)
+
+    assert not mock_api.calls
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_update_passes_rejects_a_non_uuid_template_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.update_passes(bad_id, PERSON_ID)
+
+    assert not mock_api.calls
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_delete_passes_rejects_a_non_uuid_template_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.delete_passes(bad_id, PERSON_ID)
+
+    assert not mock_api.calls
+
+
+@pytest.mark.parametrize("bad_id", NON_UUID_IDS)
+async def test_search_persons_rejects_a_non_uuid_template_id(
+    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
+) -> None:
+    with pytest.raises(ValueError):
+        await heidi.search_persons(bad_id, "ada")
+
+    assert not mock_api.calls

@@ -114,14 +114,26 @@ def _retry_after(response: httpx.Response) -> float | None:
         return None
 
 
+def _redacted_url(url: httpx.URL) -> str:
+    """Return ``url`` with its query string replaced by a redaction marker.
+
+    The self-service endpoints carry the opaque payload -- a capability-like
+    secret -- as a query parameter. Keeping it out of exception messages
+    keeps it out of logs too. The path and everything before it is kept
+    unchanged since it carries no secret.
+    """
+    without_query = str(url.copy_with(query=None))
+    return f"{without_query}?<redacted>" if url.query else without_query
+
+
 def error_from_response(response: httpx.Response) -> HeidiError | None:
     """Map an HTTP response to a :class:`HeidiError`, or ``None`` if it is fine."""
     if response.status_code < 400:
         return None
 
-    message = f"HEIDI API returned {response.status_code} for {response.request.url}"
+    request_url = _redacted_url(response.request.url)
+    message = f"HEIDI API returned {response.status_code} for {request_url}"
     status_code = response.status_code
-    request_url = str(response.request.url)
     body = response.text
 
     if status_code == 422:

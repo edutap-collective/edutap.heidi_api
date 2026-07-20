@@ -1,7 +1,7 @@
 """Tests for configuration handling."""
 
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
 from edutap.heidi_api.settings import HeidiSettings
 
@@ -34,18 +34,29 @@ def test_base_url_and_timeout_are_overridable(
     assert settings.timeout == 5.0
 
 
-def test_missing_credentials_are_rejected(
+def test_credentials_are_optional_for_pure_self_service_use(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """A client built for pure self-service use needs no credentials.
+
+    ``get_self_service_info`` and ``create_pass_from_payload`` carry no
+    security requirement upstream, so settings must be constructible
+    without ``HEIDI_USERNAME``/``HEIDI_PASSWORD``. Anything that does need
+    a token raises :class:`HeidiAuthError` lazily, when a token is actually
+    requested; see ``tests/test_auth.py``.
+    """
     monkeypatch.delenv("HEIDI_USERNAME", raising=False)
     monkeypatch.delenv("HEIDI_PASSWORD", raising=False)
 
-    with pytest.raises(ValidationError):
-        HeidiSettings(_env_file=None)  # type: ignore
+    settings = HeidiSettings(_env_file=None)  # type: ignore
+
+    assert settings.username is None
+    assert settings.password is None
 
 
 def test_password_is_not_leaked_by_repr() -> None:
     settings = HeidiSettings(username="ada", password=SecretStr("s3cret"))
 
     assert "s3cret" not in repr(settings)
+    assert settings.password is not None
     assert settings.password.get_secret_value() == "s3cret"

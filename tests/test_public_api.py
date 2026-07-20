@@ -19,6 +19,7 @@ EXPECTED = {
     "PassTemplate",
     "PayloadInfo",
     "PayloadPass",
+    "ValidationErrorDetail",
     "WalletType",
     "__version__",
 }

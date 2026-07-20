@@ -49,3 +49,17 @@ async def heidi(
 @pytest.fixture
 def external_http_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(base_url=BASE_URL)
+
+
+@pytest.fixture
+def anonymous_settings() -> HeidiSettings:
+    """Settings for a client built for pure self-service use, no credentials."""
+    return HeidiSettings(base_url=BASE_URL, username=None, password=None)
+
+
+@pytest.fixture
+async def anonymous_heidi(
+    anonymous_settings: HeidiSettings, mock_api: respx.MockRouter
+) -> AsyncIterator[HeidiClient]:
+    async with HeidiClient(settings=anonymous_settings) as client:
+        yield client

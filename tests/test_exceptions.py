@@ -21,8 +21,10 @@ def _response(
     json: object = None,
     text: str | None = None,
     headers: dict[str, str] | None = None,
+    url: str = "https://api.example.org/api/v1/pass",
+    method: str = "GET",
 ) -> httpx.Response:
-    request = httpx.Request("GET", "https://api.example.org/api/v1/pass")
+    request = httpx.Request(method, url)
     return httpx.Response(
         status_code, request=request, json=json, text=text, headers=headers
     )
@@ -115,3 +117,36 @@ def test_error_keeps_the_response_body() -> None:
     assert error is not None
     assert error.body == "pass not found"
     assert "404" in str(error)
+
+
+def test_error_redacts_the_query_string_of_the_request_url() -> None:
+    """The self-service calls carry the opaque payload as a query parameter.
+
+    It must not end up verbatim in an exception's message or ``request_url``
+    -- both are prone to landing in logs.
+    """
+    error = error_from_response(
+        _response(
+            401,
+            text="unauthorized",
+            url="https://api.example.org/api/v1/self-service/info"
+            "?payload=super-secret-token",
+            method="POST",
+        )
+    )
+
+    assert error is not None
+    assert error.request_url is not None
+    assert "super-secret-token" not in str(error)
+    assert "super-secret-token" not in error.request_url
+    assert error.request_url == (
+        "https://api.example.org/api/v1/self-service/info?<redacted>"
+    )
+
+
+def test_error_request_url_is_unchanged_without_a_query_string() -> None:
+    error = error_from_response(_response(404, text="pass not found"))
+
+    assert error is not None
+    assert error.request_url == "https://api.example.org/api/v1/pass"
+    assert "?" not in error.request_url
