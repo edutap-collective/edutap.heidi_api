@@ -29,8 +29,9 @@ While a pass is in a pending state, HEIDI rejects further mutations on it — th
 It cannot: the `POST /security/token` response carries an `access_token` and a `token_type`, nothing else, no `expires_in` or issue time to schedule a refresh against.
 
 So the client treats expiry as something the server reports, not something it predicts.
-Every request goes out with the current token.
-If the server answers `401 Unauthorized`, the client assumes the token has expired, fetches a new one, and replays the request exactly once.
+Every authenticated request goes out with the current token.
+(Two operations, `get_self_service_info` and `create_pass_from_payload`, carry no security requirement upstream and deliberately send none — the opaque payload is itself the authorization; see {doc}`how-to`.)
+If the server answers `401 Unauthorized` on an authenticated request, the client assumes the token has expired, fetches a new one, and replays the request exactly once.
 A `401` on that replay is not treated as another expired token — it means the credentials themselves are wrong — and surfaces as `HeidiAuthError`.
 
 This keeps the client simple: there is no background timer, no clock skew to account for, and no state beyond the token itself.

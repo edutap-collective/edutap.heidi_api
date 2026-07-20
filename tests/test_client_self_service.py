@@ -1,5 +1,7 @@
 """Tests for the self-service endpoints."""
 
+import re
+
 import pytest
 import respx
 
@@ -43,6 +45,43 @@ async def test_get_self_service_payload_decodes_a_json_string_body(
     assert result == PAYLOAD
 
 
+async def test_get_self_service_payload_falls_back_to_raw_text_on_malformed_json(
+    heidi: HeidiClient, mock_api: respx.MockRouter
+) -> None:
+    """The spec declares ``type: string, format: binary`` for this response.
+
+    A server that sends a JSON content type but a body that is not valid
+    JSON (e.g. raw or base64-encoded bytes) must not blow up the client with
+    an unhandled ``JSONDecodeError`` -- the raw text is returned instead,
+    exactly as for a non-JSON content type.
+    """
+    mock_api.get(f"/api/v1/self-service/payload/{TEMPLATE_ID}/{PERSON_ID}").respond(
+        content=b"abc123-raw", headers={"content-type": "application/json"}
+    )
+
+    result = await heidi.get_self_service_payload(TEMPLATE_ID, PERSON_ID)
+
+    assert result == "abc123-raw"
+
+
+async def test_get_self_service_payload_falls_back_to_raw_text_for_non_string_json(
+    heidi: HeidiClient, mock_api: respx.MockRouter
+) -> None:
+    """A JSON body that parses but is not a string (e.g. an object) is not
+
+    the documented shape either -- it must fall back to the raw response
+    text rather than being returned as a stringified ``dict``.
+    """
+    body = b'{"unexpected": "object"}'
+    mock_api.get(f"/api/v1/self-service/payload/{TEMPLATE_ID}/{PERSON_ID}").respond(
+        content=body, headers={"content-type": "application/json"}
+    )
+
+    result = await heidi.get_self_service_payload(TEMPLATE_ID, PERSON_ID)
+
+    assert result == body.decode()
+
+
 async def test_get_self_service_payload_person_id_with_slash_is_percent_encoded(
     heidi: HeidiClient, mock_api: respx.MockRouter
 ) -> None:
@@ -75,7 +114,7 @@ async def test_get_self_service_payload_person_id_with_slash_is_percent_encoded(
 async def test_get_self_service_payload_rejects_a_non_uuid_template_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"template_id.*{re.escape(bad_id)}"):
         await heidi.get_self_service_payload(bad_id, PERSON_ID)
 
     assert not mock_api.calls

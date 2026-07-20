@@ -27,7 +27,7 @@ _WALLET_TYPE_LIST = TypeAdapter(list[WalletType])
 _PERSON_LIST = TypeAdapter(list[dict[str, Any]])
 
 
-def _uuid_segment(value: UUID | str) -> str:
+def _uuid_segment(value: UUID | str, param_name: str) -> str:
     """Validate an identifier and render it as a safe path segment.
 
     The upstream spec declares ``pass_id`` and ``template_id`` as
@@ -35,9 +35,14 @@ def _uuid_segment(value: UUID | str) -> str:
     from being interpreted as a path-traversal (``../``) or query-injection
     (``?...``) segment once it is spliced into a URL.
 
+    :param param_name: name of the caller-facing argument ``value`` came
+        from, used to name it in the error message.
     :raises ValueError: if ``value`` is not a valid UUID.
     """
-    return str(UUID(str(value)))
+    try:
+        return str(UUID(str(value)))
+    except ValueError as exc:
+        raise ValueError(f"{param_name} is not a valid UUID: {value!r}") from exc
 
 
 class HeidiClient:
@@ -174,18 +179,22 @@ class HeidiClient:
 
     async def get_pass(self, pass_id: UUID | str) -> PassData:
         """Return a single pass by its identifier."""
-        response = await self._request("GET", f"/api/v1/pass/{_uuid_segment(pass_id)}")
+        response = await self._request(
+            "GET", f"/api/v1/pass/{_uuid_segment(pass_id, 'pass_id')}"
+        )
         return PassData.model_validate(response.json())
 
     async def update_pass(self, pass_id: UUID | str) -> PassOperationResponse:
         """Ask HEIDI to update a pass. The update runs asynchronously."""
-        response = await self._request("PUT", f"/api/v1/pass/{_uuid_segment(pass_id)}")
+        response = await self._request(
+            "PUT", f"/api/v1/pass/{_uuid_segment(pass_id, 'pass_id')}"
+        )
         return PassOperationResponse.model_validate(response.json())
 
     async def delete_pass(self, pass_id: UUID | str) -> PassOperationResponse:
         """Ask HEIDI to delete a pass. The deletion runs asynchronously."""
         response = await self._request(
-            "DELETE", f"/api/v1/pass/{_uuid_segment(pass_id)}"
+            "DELETE", f"/api/v1/pass/{_uuid_segment(pass_id, 'pass_id')}"
         )
         return PassOperationResponse.model_validate(response.json())
 
@@ -199,7 +208,7 @@ class HeidiClient:
         """Ask HEIDI to create a pass for a person from a template."""
         operation = CreatePassOperation(
             wallet_type=WalletType(wallet_type),
-            template_id=UUID(_uuid_segment(template_id)),
+            template_id=_uuid_segment(template_id, "template_id"),
             person_id=person_id,
         )
         response = await self._request(
@@ -213,7 +222,8 @@ class HeidiClient:
         """Return every pass a person holds for one template."""
         response = await self._request(
             "GET",
-            f"/api/v1/passes/{_uuid_segment(template_id)}/{quote(person_id, safe='')}",
+            f"/api/v1/passes/{_uuid_segment(template_id, 'template_id')}/"
+            f"{quote(person_id, safe='')}",
         )
         return _PASS_LIST.validate_python(response.json())
 
@@ -223,7 +233,8 @@ class HeidiClient:
         """Ask HEIDI to update every pass a person holds for one template."""
         response = await self._request(
             "PUT",
-            f"/api/v1/passes/{_uuid_segment(template_id)}/{quote(person_id, safe='')}",
+            f"/api/v1/passes/{_uuid_segment(template_id, 'template_id')}/"
+            f"{quote(person_id, safe='')}",
         )
         return PassOperationResponse.model_validate(response.json())
 
@@ -233,7 +244,8 @@ class HeidiClient:
         """Ask HEIDI to delete every pass a person holds for one template."""
         response = await self._request(
             "DELETE",
-            f"/api/v1/passes/{_uuid_segment(template_id)}/{quote(person_id, safe='')}",
+            f"/api/v1/passes/{_uuid_segment(template_id, 'template_id')}/"
+            f"{quote(person_id, safe='')}",
         )
         return PassOperationResponse.model_validate(response.json())
 
@@ -258,7 +270,7 @@ class HeidiClient:
         response = await self._request(
             "GET",
             f"/api/v1/search_persons/"
-            f"{_uuid_segment(template_id)}/{quote(term, safe='')}",
+            f"{_uuid_segment(template_id, 'template_id')}/{quote(term, safe='')}",
         )
         return _PERSON_LIST.validate_python(response.json())
 
@@ -275,15 +287,25 @@ class HeidiClient:
         The spec declares this response as ``application/json`` with
         ``type: string``, so the body may arrive JSON-encoded (quoted) rather
         than as raw text. Both shapes are normalised to the plain string.
+
+        Upstream actually declares ``type: string, format: binary``, so a
+        server may also answer with a ``content-type: application/json``
+        header and a body that is not valid JSON at all (e.g. base64 bytes).
+        That case falls back to the raw text exactly like a non-JSON
+        content type, rather than raising ``JSONDecodeError``.
         """
         response = await self._request(
             "GET",
             f"/api/v1/self-service/payload/"
-            f"{_uuid_segment(template_id)}/{quote(person_id, safe='')}",
+            f"{_uuid_segment(template_id, 'template_id')}/"
+            f"{quote(person_id, safe='')}",
         )
         content_type = response.headers.get("content-type", "")
         if content_type.startswith("application/json"):
-            decoded = response.json()
+            try:
+                decoded = response.json()
+            except ValueError:
+                return response.text
             if isinstance(decoded, str):
                 return decoded
         return response.text

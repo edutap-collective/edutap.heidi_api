@@ -1,5 +1,6 @@
 """Tests for the issuer endpoints."""
 
+import re
 from uuid import UUID
 
 import pytest
@@ -225,7 +226,7 @@ NON_UUID_IDS = [
 async def test_get_pass_rejects_a_non_uuid_pass_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"pass_id.*{re.escape(bad_id)}"):
         await heidi.get_pass(bad_id)
 
     assert not mock_api.calls
@@ -235,7 +236,7 @@ async def test_get_pass_rejects_a_non_uuid_pass_id(
 async def test_update_pass_rejects_a_non_uuid_pass_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"pass_id.*{re.escape(bad_id)}"):
         await heidi.update_pass(bad_id)
 
     assert not mock_api.calls
@@ -245,7 +246,7 @@ async def test_update_pass_rejects_a_non_uuid_pass_id(
 async def test_delete_pass_rejects_a_non_uuid_pass_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"pass_id.*{re.escape(bad_id)}"):
         await heidi.delete_pass(bad_id)
 
     assert not mock_api.calls
@@ -255,7 +256,7 @@ async def test_delete_pass_rejects_a_non_uuid_pass_id(
 async def test_create_pass_rejects_a_non_uuid_template_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"template_id.*{re.escape(bad_id)}"):
         await heidi.create_pass(
             template_id=bad_id, person_id=PERSON_ID, wallet_type=WalletType.APPLE
         )
@@ -267,7 +268,7 @@ async def test_create_pass_rejects_a_non_uuid_template_id(
 async def test_get_passes_rejects_a_non_uuid_template_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"template_id.*{re.escape(bad_id)}"):
         await heidi.get_passes(bad_id, PERSON_ID)
 
     assert not mock_api.calls
@@ -277,7 +278,7 @@ async def test_get_passes_rejects_a_non_uuid_template_id(
 async def test_update_passes_rejects_a_non_uuid_template_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"template_id.*{re.escape(bad_id)}"):
         await heidi.update_passes(bad_id, PERSON_ID)
 
     assert not mock_api.calls
@@ -287,7 +288,7 @@ async def test_update_passes_rejects_a_non_uuid_template_id(
 async def test_delete_passes_rejects_a_non_uuid_template_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"template_id.*{re.escape(bad_id)}"):
         await heidi.delete_passes(bad_id, PERSON_ID)
 
     assert not mock_api.calls
@@ -297,7 +298,7 @@ async def test_delete_passes_rejects_a_non_uuid_template_id(
 async def test_search_persons_rejects_a_non_uuid_template_id(
     heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"template_id.*{re.escape(bad_id)}"):
         await heidi.search_persons(bad_id, "ada")
 
     assert not mock_api.calls

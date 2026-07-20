@@ -75,6 +75,13 @@ subclass to react to one status code. `HeidiRateLimitError` exposes
 `retry_after` — the parsed `Retry-After` header, in seconds, or `None` if
 HEIDI did not send one:
 
+The exception message redacts the query string of `request_url`, since the
+self-service endpoints carry the opaque payload there. `HeidiError.body` is
+not redacted, though: it is the response body HEIDI sent back, verbatim, and
+a self-service error response could echo the payload into it. Do not log
+`HeidiError.body` verbatim in contexts where that payload must stay
+confidential.
+
 ```python
 import anyio
 
