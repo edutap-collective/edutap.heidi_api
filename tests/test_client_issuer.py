@@ -172,3 +172,44 @@ async def test_person_search_term_is_url_encoded(
     await heidi.search_persons(TEMPLATE_ID, "ada lovelace")
 
     assert route.called
+
+
+async def test_person_search_term_with_slash_is_percent_encoded(
+    heidi: HeidiClient, mock_api: respx.MockRouter
+) -> None:
+    """A ``/`` in the search term must not introduce an extra path segment.
+
+    respx's path matching decodes ``%2F`` back to ``/`` before comparing, so a
+    single route (matched by decoded path) catches both an encoded and an
+    unencoded request equally. The distinction that matters -- whether the
+    slash was actually percent-encoded on the wire -- is only visible on the
+    raw request that respx recorded, so that is what this test asserts on.
+    """
+    route = mock_api.get(f"/api/v1/search_persons/{TEMPLATE_ID}/cs/101").respond(
+        json=[]
+    )
+
+    await heidi.search_persons(TEMPLATE_ID, "cs/101")
+
+    assert route.called
+    sent_path = route.calls[0].request.url.raw_path.decode()
+    assert sent_path == f"/api/v1/search_persons/{TEMPLATE_ID}/cs%2F101"
+
+
+async def test_get_passes_person_id_with_slash_is_percent_encoded(
+    heidi: HeidiClient, mock_api: respx.MockRouter
+) -> None:
+    """A ``/`` in ``person_id`` must not introduce an extra path segment.
+
+    See the search-term counterpart above for why the assertion inspects the
+    raw request path rather than relying on respx route dispatch.
+    """
+    route = mock_api.get(f"/api/v1/passes/{TEMPLATE_ID}/dept/42").respond(
+        json=[PASS_PAYLOAD]
+    )
+
+    await heidi.get_passes(TEMPLATE_ID, "dept/42")
+
+    assert route.called
+    sent_path = route.calls[0].request.url.raw_path.decode()
+    assert sent_path == f"/api/v1/passes/{TEMPLATE_ID}/dept%2F42"

@@ -157,7 +157,7 @@ class HeidiClient:
     ) -> list[PassData]:
         """Return every pass a person holds for one template."""
         response = await self._request(
-            "GET", f"/api/v1/passes/{template_id}/{quote(person_id)}"
+            "GET", f"/api/v1/passes/{template_id}/{quote(person_id, safe='')}"
         )
         return _PASS_LIST.validate_python(response.json())
 
@@ -166,7 +166,7 @@ class HeidiClient:
     ) -> PassOperationResponse:
         """Ask HEIDI to update every pass a person holds for one template."""
         response = await self._request(
-            "PUT", f"/api/v1/passes/{template_id}/{quote(person_id)}"
+            "PUT", f"/api/v1/passes/{template_id}/{quote(person_id, safe='')}"
         )
         return PassOperationResponse.model_validate(response.json())
 
@@ -175,7 +175,7 @@ class HeidiClient:
     ) -> PassOperationResponse:
         """Ask HEIDI to delete every pass a person holds for one template."""
         response = await self._request(
-            "DELETE", f"/api/v1/passes/{template_id}/{quote(person_id)}"
+            "DELETE", f"/api/v1/passes/{template_id}/{quote(person_id, safe='')}"
         )
         return PassOperationResponse.model_validate(response.json())
 
@@ -198,6 +198,6 @@ class HeidiClient:
         returned unchanged.
         """
         response = await self._request(
-            "GET", f"/api/v1/search_persons/{template_id}/{quote(term)}"
+            "GET", f"/api/v1/search_persons/{template_id}/{quote(term, safe='')}"
         )
         return list(response.json())
