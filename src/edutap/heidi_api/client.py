@@ -16,6 +16,7 @@ from edutap.heidi_api.models import (
     PassData,
     PassOperationResponse,
     PassTemplate,
+    PayloadInfo,
     WalletType,
 )
 from edutap.heidi_api.settings import HeidiSettings
@@ -201,3 +202,35 @@ class HeidiClient:
             "GET", f"/api/v1/search_persons/{template_id}/{quote(term, safe='')}"
         )
         return list(response.json())
+
+    async def get_self_service_payload(
+        self, template_id: UUID | str, person_id: str
+    ) -> str:
+        """Return the opaque self-service payload for a person and template.
+
+        The payload has no documented structure; pass it back unchanged to
+        :meth:`get_self_service_info` or :meth:`create_pass_from_payload`.
+        """
+        response = await self._request(
+            "GET",
+            f"/api/v1/self-service/payload/{template_id}/{quote(person_id, safe='')}",
+        )
+        return response.text
+
+    async def get_self_service_info(self, payload: str) -> PayloadInfo:
+        """Describe what a self-service payload refers to."""
+        response = await self._request(
+            "POST", "/api/v1/self-service/info", params={"payload": payload}
+        )
+        return PayloadInfo.model_validate(response.json())
+
+    async def create_pass_from_payload(
+        self, wallet_type: WalletType | str, payload: str
+    ) -> PassOperationResponse:
+        """Create a pass for the person a self-service payload refers to."""
+        response = await self._request(
+            "POST",
+            f"/api/v1/self-service/create/{WalletType(wallet_type).value}",
+            params={"payload": payload},
+        )
+        return PassOperationResponse.model_validate(response.json())
