@@ -9,3 +9,7 @@ build/
 *.egg-info/
 .env
 docs/_build/
+
+# Deliberately not committed: tox uses the non-locked uv-venv-runner so the
+# test matrix runs against current dependency releases, not a pinned set.
+uv.lock

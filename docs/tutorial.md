@@ -5,10 +5,11 @@ reports it as installed.
 
 ## Prerequisites
 
-Install the package and set your credentials:
+Install the package and set your credentials. The package is not published
+to PyPI yet, so install it from the source repository:
 
 ```console
-uv pip install -U edutap.heidi_api
+uv pip install git+https://github.com/edutap-eu/edutap.heidi_api
 export HEIDI_USERNAME=your-user
 export HEIDI_PASSWORD=your-password
 ```

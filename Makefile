@@ -2,7 +2,7 @@
 
 install:
 	uv venv
-	uv pip install -U -e ".[dev]"
+	uv pip install -U -e ".[dev,docs]"
 
 lint:
 	uv run ruff check src tests

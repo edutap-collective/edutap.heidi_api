@@ -56,6 +56,39 @@ async with HeidiClient() as heidi:
         ...  # retry later; a previous operation is still pending
 ```
 
+## Handle other HEIDI error responses
+
+Every error response HEIDI returns is raised as a subclass of `HeidiError`,
+which carries `status_code`, `request_url` and `body`:
+
+| Exception | Status | Notes |
+| --- | --- | --- |
+| `HeidiAuthError` | 401 | Authentication failed or the token was rejected. |
+| `HeidiNotFoundError` | 404 | The pass, template or person does not exist. |
+| `HeidiConflictError` | 409 | Another operation on the same pass is still running. |
+| `HeidiValidationError` | 422 | The request was rejected as invalid; `errors` holds the parsed detail list. |
+| `HeidiRateLimitError` | 429 | Too many requests; upstream declares this on `/security/token`. |
+| `HeidiServerError` | 5xx | HEIDI failed to handle the request. |
+
+Catch `HeidiError` itself to handle every case uniformly, or catch a specific
+subclass to react to one status code. `HeidiRateLimitError` exposes
+`retry_after` — the parsed `Retry-After` header, in seconds, or `None` if
+HEIDI did not send one:
+
+```python
+import anyio
+
+from edutap.heidi_api import HeidiClient, HeidiRateLimitError
+
+async with HeidiClient() as heidi:
+    try:
+        await heidi.whoami()
+    except HeidiRateLimitError as exc:
+        if exc.retry_after is not None:
+            await anyio.sleep(exc.retry_after)
+        # retry the call
+```
+
 ## Use the self-service flow
 
 ```python

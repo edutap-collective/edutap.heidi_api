@@ -4,8 +4,11 @@ Pythonic async client for the [HEIDI Cloud Service](https://api.cloud.heidi-pass
 
 ## Installation
 
+The package is not published to PyPI yet. Install it straight from the
+source repository:
+
 ```console
-uv pip install -U -e ".[dev]"
+uv pip install git+https://github.com/edutap-eu/edutap.heidi_api
 ```
 
 ## Usage
@@ -22,7 +25,12 @@ optionally `HEIDI_BASE_URL` and `HEIDI_TIMEOUT`.
 
 ## Development
 
+Clone the repository and install it in editable mode with the development
+extras:
+
 ```console
+git clone https://github.com/edutap-eu/edutap.heidi_api
+cd edutap.heidi_api
 make install
 make lint
 make test-local

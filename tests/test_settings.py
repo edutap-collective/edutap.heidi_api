@@ -12,7 +12,7 @@ def test_settings_read_from_the_environment(
     monkeypatch.setenv("HEIDI_USERNAME", "ada")
     monkeypatch.setenv("HEIDI_PASSWORD", "s3cret")
 
-    settings = HeidiSettings()
+    settings = HeidiSettings(_env_file=None)  # type: ignore
 
     assert settings.username == "ada"
     assert settings.password == SecretStr("s3cret")
@@ -28,7 +28,7 @@ def test_base_url_and_timeout_are_overridable(
     monkeypatch.setenv("HEIDI_BASE_URL", "https://staging.example.org")
     monkeypatch.setenv("HEIDI_TIMEOUT", "5")
 
-    settings = HeidiSettings()
+    settings = HeidiSettings(_env_file=None)  # type: ignore
 
     assert str(settings.base_url) == "https://staging.example.org/"
     assert settings.timeout == 5.0
@@ -55,7 +55,11 @@ def test_credentials_are_optional_for_pure_self_service_use(
 
 
 def test_password_is_not_leaked_by_repr() -> None:
-    settings = HeidiSettings(username="ada", password=SecretStr("s3cret"))
+    settings = HeidiSettings(
+        username="ada",
+        password=SecretStr("s3cret"),
+        _env_file=None,  # type: ignore
+    )
 
     assert "s3cret" not in repr(settings)
     assert settings.password is not None
