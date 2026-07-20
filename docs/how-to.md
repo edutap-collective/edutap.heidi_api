@@ -57,6 +57,8 @@ async with HeidiClient() as heidi:
 ## Use the self-service flow
 
 ```python
+from edutap.heidi_api import HeidiClient, WalletType
+
 async with HeidiClient() as heidi:
     payload = await heidi.get_self_service_payload(template_id, person_id)
     info = await heidi.get_self_service_info(payload)

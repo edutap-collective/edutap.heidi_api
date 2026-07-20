@@ -4,6 +4,28 @@
 Every method is a coroutine.
 Every method that mutates a pass returns a `PassOperationResponse` and does not wait for the change to take effect; see {doc}`explanation` for what that means.
 
+## Constructing and closing the client
+
+```python
+HeidiClient(
+    settings: HeidiSettings | None = None,
+    http_client: httpx.AsyncClient | None = None,
+) -> HeidiClient
+```
+
+Both arguments are optional and keyword-or-positional.
+
+- `settings` — a `HeidiSettings` instance. If omitted, `HeidiClient` builds one itself, which reads credentials and configuration from the environment (and a `.env` file); see {doc}`how-to`.
+- `http_client` — an `httpx.AsyncClient` to send requests through. If omitted, `HeidiClient` creates its own, using `settings.base_url` and `settings.timeout`. Pass one in when the surrounding application already manages a connection pool.
+
+`HeidiClient` implements the async context manager protocol; `__aenter__` returns `self`, and `__aexit__` calls `aclose()`. Used without the context manager, call `aclose()` explicitly when done:
+
+```python
+await heidi.aclose()
+```
+
+`aclose()` closes the underlying `httpx.AsyncClient` — but only if `HeidiClient` created it itself. An `http_client` passed in is borrowed, not owned: `aclose()` leaves it open for the caller to reuse or close.
+
 ## Client methods
 
 | Method | HTTP operation |
