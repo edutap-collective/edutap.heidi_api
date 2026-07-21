@@ -1,6 +1,6 @@
 """Tests for the self-service endpoints."""
 
-import re
+from uuid import UUID
 
 import pytest
 import respx
@@ -11,8 +11,8 @@ from edutap.heidi_api.models import PassState, PayloadInfo, WalletType
 
 pytestmark = pytest.mark.anyio
 
-TEMPLATE_ID = "22222222-2222-2222-2222-222222222222"
-PERSON_ID = "person-42"
+TEMPLATE_ID = UUID("22222222-2222-2222-2222-222222222222")
+PERSON_ID = "jdoe@example.edu"
 PAYLOAD = "opaque-payload-token"
 
 
@@ -82,42 +82,34 @@ async def test_get_self_service_payload_falls_back_to_raw_text_for_non_string_js
     assert result == body.decode()
 
 
-async def test_get_self_service_payload_person_id_with_slash_is_percent_encoded(
+async def test_get_self_service_payload_rejects_an_invalid_person_id(
     heidi: HeidiClient, mock_api: respx.MockRouter
 ) -> None:
-    """A ``/`` in ``person_id`` must not introduce an extra path segment.
+    with pytest.raises(ValueError, match="person_id"):
+        await heidi.get_self_service_payload(TEMPLATE_ID, "dept/42")
 
-    See the search-term counterpart in ``test_client_issuer.py`` for why the
-    assertion inspects the raw request path rather than relying on respx
-    route dispatch: respx decodes ``%2F`` back to ``/`` before matching, so
-    only the raw recorded path reveals whether the slash was actually
-    percent-encoded on the wire.
+    assert not mock_api.calls
+
+
+async def test_get_self_service_payload_person_id_reaches_the_wire_raw(
+    heidi: HeidiClient, mock_api: respx.MockRouter
+) -> None:
+    """A valid scoped ``person_id`` is interpolated unencoded.
+
+    ``@`` is a permitted path character, so a valid scoped identifier does
+    not need percent-encoding -- and must arrive on the wire exactly as
+    given, not as ``%40``.
     """
-    route = mock_api.get(f"/api/v1/self-service/payload/{TEMPLATE_ID}/dept/42").respond(
-        text=PAYLOAD
-    )
+    route = mock_api.get(
+        f"/api/v1/self-service/payload/{TEMPLATE_ID}/{PERSON_ID}"
+    ).respond(text=PAYLOAD)
 
-    await heidi.get_self_service_payload(TEMPLATE_ID, "dept/42")
+    await heidi.get_self_service_payload(TEMPLATE_ID, PERSON_ID)
 
     assert route.called
     sent_path = route.calls[0].request.url.raw_path.decode()
-    assert sent_path == f"/api/v1/self-service/payload/{TEMPLATE_ID}/dept%2F42"
-
-
-@pytest.mark.parametrize(
-    "bad_id",
-    [
-        "../../security/authenticated",  # path traversal via dot-segment normalisation
-        "abc?admin=1",  # query-string injection
-    ],
-)
-async def test_get_self_service_payload_rejects_a_non_uuid_template_id(
-    heidi: HeidiClient, mock_api: respx.MockRouter, bad_id: str
-) -> None:
-    with pytest.raises(ValueError, match=f"template_id.*{re.escape(bad_id)}"):
-        await heidi.get_self_service_payload(bad_id, PERSON_ID)
-
-    assert not mock_api.calls
+    assert PERSON_ID in sent_path
+    assert "%40" not in sent_path
 
 
 async def test_get_self_service_info_sends_the_payload_as_a_query_parameter(

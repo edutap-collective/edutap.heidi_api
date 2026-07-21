@@ -31,24 +31,29 @@ await heidi.aclose()
 | Method | HTTP operation |
 | --- | --- |
 | `whoami() -> AuthenticatedUser` | `GET /security/authenticated` |
-| `get_pass(pass_id: UUID \| str) -> PassData` | `GET /api/v1/pass/{pass_id}` |
-| `update_pass(pass_id: UUID \| str) -> PassOperationResponse` | `PUT /api/v1/pass/{pass_id}` |
-| `delete_pass(pass_id: UUID \| str) -> PassOperationResponse` | `DELETE /api/v1/pass/{pass_id}` |
-| `create_pass(*, template_id: UUID \| str, person_id: str, wallet_type: WalletType \| str) -> PassOperationResponse` | `POST /api/v1/pass` |
-| `get_passes(template_id: UUID \| str, person_id: str) -> list[PassData]` | `GET /api/v1/passes/{template_id}/{person_id}` |
-| `update_passes(template_id: UUID \| str, person_id: str) -> PassOperationResponse` | `PUT /api/v1/passes/{template_id}/{person_id}` |
-| `delete_passes(template_id: UUID \| str, person_id: str) -> PassOperationResponse` | `DELETE /api/v1/passes/{template_id}/{person_id}` |
+| `get_pass(pass_id: UUID) -> PassData` | `GET /api/v1/pass/{pass_id}` |
+| `update_pass(pass_id: UUID) -> PassOperationResponse` | `PUT /api/v1/pass/{pass_id}` |
+| `delete_pass(pass_id: UUID) -> PassOperationResponse` | `DELETE /api/v1/pass/{pass_id}` |
+| `create_pass(*, template_id: UUID, person_id: str, wallet_type: WalletType \| str) -> PassOperationResponse` | `POST /api/v1/pass` |
+| `get_passes(template_id: UUID, person_id: str) -> list[PassData]` | `GET /api/v1/passes/{template_id}/{person_id}` |
+| `update_passes(template_id: UUID, person_id: str) -> PassOperationResponse` | `PUT /api/v1/passes/{template_id}/{person_id}` |
+| `delete_passes(template_id: UUID, person_id: str) -> PassOperationResponse` | `DELETE /api/v1/passes/{template_id}/{person_id}` |
 | `list_wallet_types() -> list[WalletType]` | `GET /api/v1/wallet_types` |
 | `list_pass_templates() -> list[PassTemplate]` | `GET /api/v1/pass_templates` |
-| `search_persons(template_id: UUID \| str, term: str) -> list[dict[str, Any]]` | `GET /api/v1/search_persons/{template_id}/{term}` |
-| `get_self_service_payload(template_id: UUID \| str, person_id: str) -> str` | `GET /api/v1/self-service/payload/{template_id}/{person_id}` |
+| `search_persons(template_id: UUID, term: str) -> list[dict[str, Any]]` | `GET /api/v1/search_persons/{template_id}/{term}` |
+| `get_self_service_payload(template_id: UUID, person_id: str) -> str` | `GET /api/v1/self-service/payload/{template_id}/{person_id}` |
 | `get_self_service_info(payload: str) -> PayloadInfo` | `POST /api/v1/self-service/info` |
 | `create_pass_from_payload(wallet_type: WalletType \| str, payload: str) -> PassOperationResponse` | `POST /api/v1/self-service/create/{wallet_type}` |
 
 `create_pass` takes its three arguments as keyword-only.
 `get_pass`, `update_pass` and `delete_pass` accept a `pass_id` on its own; the other pass-plural methods identify a person's passes for one template by `template_id` and `person_id` together.
 `search_persons` returns raw dictionaries: the HEIDI API declares this endpoint's response as a free-form object.
-Every `pass_id`/`template_id` is validated as a UUID and rejected otherwise — this also rejects path-traversal or query-injection strings before they ever reach the network.
+
+Every `pass_id`/`template_id` is declared `format: uuid` upstream and typed strictly as `UUID` — a plain `str` is rejected by the type checker at author time, and a runtime guard rejects anything that is not a valid UUID even if the type checker was bypassed, including path-traversal or query-injection strings, before they ever reach the network.
+
+Every `person_id` must be a SAML scoped identifier of the form `local@scope` — exactly one `@`, a non-empty local part and a non-empty scope, no `/` or whitespace. eduTAP addresses persons by one of four SAML identifier types, all sharing this scoped form: eduPersonPrincipalName, eduPersonUniqueId, subject-id and pairwise-id. `person_id` stays typed as `str` (HEIDI's own spec declares it only as `string`), but every method that sends one validates it before use and rejects anything else with a `ValueError`. A valid scoped identifier is interpolated into the URL path unencoded — `@` is a permitted path character, so the value reaches HEIDI exactly as given.
+
+`term` (the search string passed to `search_persons`) and `payload` (the opaque self-service payload) remain free strings with no format validation.
 
 ### Authentication
 

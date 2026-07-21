@@ -20,29 +20,12 @@ from edutap.heidi_api.models import (
     WalletType,
 )
 from edutap.heidi_api.settings import HeidiSettings
+from edutap.heidi_api.validation import to_uuid_segment, validate_person_id
 
 _PASS_LIST = TypeAdapter(list[PassData])
 _TEMPLATE_LIST = TypeAdapter(list[PassTemplate])
 _WALLET_TYPE_LIST = TypeAdapter(list[WalletType])
 _PERSON_LIST = TypeAdapter(list[dict[str, Any]])
-
-
-def _uuid_segment(value: UUID | str, param_name: str) -> str:
-    """Validate an identifier and render it as a safe path segment.
-
-    The upstream spec declares ``pass_id`` and ``template_id`` as
-    ``format: uuid``. Rejecting anything else keeps a caller-supplied value
-    from being interpreted as a path-traversal (``../``) or query-injection
-    (``?...``) segment once it is spliced into a URL.
-
-    :param param_name: name of the caller-facing argument ``value`` came
-        from, used to name it in the error message.
-    :raises ValueError: if ``value`` is not a valid UUID.
-    """
-    try:
-        return str(UUID(str(value)))
-    except ValueError as exc:
-        raise ValueError(f"{param_name} is not a valid UUID: {value!r}") from exc
 
 
 class HeidiClient:
@@ -177,38 +160,39 @@ class HeidiClient:
         response = await self._request("GET", "/security/authenticated")
         return AuthenticatedUser.model_validate(response.json())
 
-    async def get_pass(self, pass_id: UUID | str) -> PassData:
+    async def get_pass(self, pass_id: UUID) -> PassData:
         """Return a single pass by its identifier."""
         response = await self._request(
-            "GET", f"/api/v1/pass/{_uuid_segment(pass_id, 'pass_id')}"
+            "GET", f"/api/v1/pass/{to_uuid_segment(pass_id, 'pass_id')}"
         )
         return PassData.model_validate(response.json())
 
-    async def update_pass(self, pass_id: UUID | str) -> PassOperationResponse:
+    async def update_pass(self, pass_id: UUID) -> PassOperationResponse:
         """Ask HEIDI to update a pass. The update runs asynchronously."""
         response = await self._request(
-            "PUT", f"/api/v1/pass/{_uuid_segment(pass_id, 'pass_id')}"
+            "PUT", f"/api/v1/pass/{to_uuid_segment(pass_id, 'pass_id')}"
         )
         return PassOperationResponse.model_validate(response.json())
 
-    async def delete_pass(self, pass_id: UUID | str) -> PassOperationResponse:
+    async def delete_pass(self, pass_id: UUID) -> PassOperationResponse:
         """Ask HEIDI to delete a pass. The deletion runs asynchronously."""
         response = await self._request(
-            "DELETE", f"/api/v1/pass/{_uuid_segment(pass_id, 'pass_id')}"
+            "DELETE", f"/api/v1/pass/{to_uuid_segment(pass_id, 'pass_id')}"
         )
         return PassOperationResponse.model_validate(response.json())
 
     async def create_pass(
         self,
         *,
-        template_id: UUID | str,
+        template_id: UUID,
         person_id: str,
         wallet_type: WalletType | str,
     ) -> PassOperationResponse:
         """Ask HEIDI to create a pass for a person from a template."""
+        validate_person_id(person_id)
         operation = CreatePassOperation(
             wallet_type=WalletType(wallet_type),
-            template_id=_uuid_segment(template_id, "template_id"),
+            template_id=to_uuid_segment(template_id, "template_id"),
             person_id=person_id,
         )
         response = await self._request(
@@ -216,36 +200,34 @@ class HeidiClient:
         )
         return PassOperationResponse.model_validate(response.json())
 
-    async def get_passes(
-        self, template_id: UUID | str, person_id: str
-    ) -> list[PassData]:
+    async def get_passes(self, template_id: UUID, person_id: str) -> list[PassData]:
         """Return every pass a person holds for one template."""
+        validate_person_id(person_id)
         response = await self._request(
             "GET",
-            f"/api/v1/passes/{_uuid_segment(template_id, 'template_id')}/"
-            f"{quote(person_id, safe='')}",
+            f"/api/v1/passes/{to_uuid_segment(template_id, 'template_id')}/{person_id}",
         )
         return _PASS_LIST.validate_python(response.json())
 
     async def update_passes(
-        self, template_id: UUID | str, person_id: str
+        self, template_id: UUID, person_id: str
     ) -> PassOperationResponse:
         """Ask HEIDI to update every pass a person holds for one template."""
+        validate_person_id(person_id)
         response = await self._request(
             "PUT",
-            f"/api/v1/passes/{_uuid_segment(template_id, 'template_id')}/"
-            f"{quote(person_id, safe='')}",
+            f"/api/v1/passes/{to_uuid_segment(template_id, 'template_id')}/{person_id}",
         )
         return PassOperationResponse.model_validate(response.json())
 
     async def delete_passes(
-        self, template_id: UUID | str, person_id: str
+        self, template_id: UUID, person_id: str
     ) -> PassOperationResponse:
         """Ask HEIDI to delete every pass a person holds for one template."""
+        validate_person_id(person_id)
         response = await self._request(
             "DELETE",
-            f"/api/v1/passes/{_uuid_segment(template_id, 'template_id')}/"
-            f"{quote(person_id, safe='')}",
+            f"/api/v1/passes/{to_uuid_segment(template_id, 'template_id')}/{person_id}",
         )
         return PassOperationResponse.model_validate(response.json())
 
@@ -260,7 +242,7 @@ class HeidiClient:
         return _TEMPLATE_LIST.validate_python(response.json())
 
     async def search_persons(
-        self, template_id: UUID | str, term: str
+        self, template_id: UUID, term: str
     ) -> list[dict[str, Any]]:
         """Search persons eligible for a template.
 
@@ -270,13 +252,11 @@ class HeidiClient:
         response = await self._request(
             "GET",
             f"/api/v1/search_persons/"
-            f"{_uuid_segment(template_id, 'template_id')}/{quote(term, safe='')}",
+            f"{to_uuid_segment(template_id, 'template_id')}/{quote(term, safe='')}",
         )
         return _PERSON_LIST.validate_python(response.json())
 
-    async def get_self_service_payload(
-        self, template_id: UUID | str, person_id: str
-    ) -> str:
+    async def get_self_service_payload(self, template_id: UUID, person_id: str) -> str:
         """Return the opaque self-service payload for a person and template.
 
         The payload has no documented structure; pass it back unchanged to
@@ -294,11 +274,12 @@ class HeidiClient:
         That case falls back to the raw text exactly like a non-JSON
         content type, rather than raising ``JSONDecodeError``.
         """
+        validate_person_id(person_id)
         response = await self._request(
             "GET",
             f"/api/v1/self-service/payload/"
-            f"{_uuid_segment(template_id, 'template_id')}/"
-            f"{quote(person_id, safe='')}",
+            f"{to_uuid_segment(template_id, 'template_id')}/"
+            f"{person_id}",
         )
         content_type = response.headers.get("content-type", "")
         if content_type.startswith("application/json"):

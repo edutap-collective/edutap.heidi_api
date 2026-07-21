@@ -37,6 +37,8 @@ Mutating operations answer `202 Accepted`: HEIDI acknowledges the request and
 performs it in the background. Poll `get_pass` until the state settles.
 
 ```python
+from uuid import UUID
+
 import anyio
 
 from edutap.heidi_api import HeidiClient, PassState, WalletType
@@ -45,8 +47,8 @@ from edutap.heidi_api import HeidiClient, PassState, WalletType
 async def main() -> None:
     async with HeidiClient() as heidi:
         operation = await heidi.create_pass(
-            template_id="22222222-2222-2222-2222-222222222222",
-            person_id="person-42",
+            template_id=UUID("22222222-2222-2222-2222-222222222222"),
+            person_id="jdoe@example.edu",
             wallet_type=WalletType.APPLE,
         )
         print("accepted:", operation.detail)
