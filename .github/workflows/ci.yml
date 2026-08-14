@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Nothing here is locked: uv.lock is deliberately git-ignored and every
+  # requirement is a lower bound. A suite that passed last week can fail today
+  # with nothing changed here.
+  schedule:
+    - cron: "17 5 * * 1"
+  # Callable, so the release workflow runs *these* checks rather than its own
+  # copy. A release gate that restates the checks drifts from them, and it
+  # drifts silently, because nobody reads two files side by side.
+  workflow_call:
 
 jobs:
   test:
