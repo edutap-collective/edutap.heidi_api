@@ -184,7 +184,7 @@ async def test_fetching_a_token_without_credentials_raises_a_clear_auth_error(
     """
     monkeypatch.delenv("HEIDI_USERNAME", raising=False)
     monkeypatch.delenv("HEIDI_PASSWORD", raising=False)
-    settings = HeidiSettings(base_url=BASE_URL, _env_file=None)  # type: ignore
+    settings = HeidiSettings(base_url=BASE_URL, _env_file=None)
 
     with respx.mock(assert_all_mocked=True) as mock:
         manager = TokenManager(settings, http_client)

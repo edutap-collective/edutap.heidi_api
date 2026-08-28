@@ -110,4 +110,47 @@ async with HeidiClient() as heidi:
 
 The payload is opaque — store and forward it unchanged.
 
-`get_self_service_info` and `create_pass_from_payload` need no issuer credentials — the payload itself is the authorization — so this flow also works from a client built with `HeidiSettings(username=None, password=None)`, e.g. in a self-service frontend that never sees issuer credentials. `get_self_service_payload` still does require credentials.
+`get_self_service_info` and `create_pass_from_payload` need no issuer credentials
+— the payload itself is the authorization — so this flow also works from a client built with `HeidiSettings(username=None, password=None)`, e.g. in a self-service frontend that never sees issuer credentials. `get_self_service_payload` still does require credentials.
+
+## Release the package
+
+`.github/workflows/release.yaml` publishes twice, from the same artifact and
+never from a developer's machine:
+
+| Trigger | Target | Environment |
+| --- | --- | --- |
+| Every commit on `main` | `test.pypi.org` | `release-test-pypi` |
+| A GitHub Release marked *published* | `pypi.org` | `release-pypi` |
+
+Both uploads use [Trusted Publishing](https://docs.pypi.org/trusted-publishers/),
+so there is no API token anywhere in the repository. What authenticates the
+upload is the workflow itself, identified by repository, workflow file and
+environment.
+
+### One-time setup
+
+Do this once per index, before the first release:
+
+1. On [pypi.org](https://pypi.org/manage/account/publishing/) and again on
+   [test.pypi.org](https://test.pypi.org/manage/account/publishing/), add a
+   *pending publisher* — the form for a project that does not exist yet; see
+   [Creating a PyPI project with a trusted publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
+   Project name `edutap.heidi_api`, owner `edutap-collective`, repository
+   `edutap.heidi_api`, workflow `release.yaml`, environment `release-pypi`
+   on pypi.org and `release-test-pypi` on test.pypi.org.
+2. In the repository's *Settings → Environments*, create both environments under
+   exactly those names. A publisher that names an environment the repository
+   does not have will reject the upload, and the error names OIDC rather than
+   the missing environment.
+
+### Cutting a release
+
+1. Raise `version` in `pyproject.toml` on a branch and merge it. The commit on
+   `main` lands on Test PyPI; install it from there to check the artifact.
+2. Tag that commit `vX.Y.Z` and publish a GitHub Release for the tag. Publishing
+   — not tagging — is what uploads to pypi.org.
+
+One version means one tag means one commit. Never publish a Release for a tag
+that predates this workflow: the run happens at that ref, finds no workflow, and
+silently does nothing.

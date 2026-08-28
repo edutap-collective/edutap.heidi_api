@@ -4,12 +4,21 @@ Pythonic async client for the [HEIDI Cloud Service](https://api.cloud.heidi-pass
 
 ## Installation
 
-The package is not published to PyPI yet. Install it straight from the
-source repository:
+```console
+uv pip install edutap.heidi_api
+```
+
+Every commit on `main` also publishes to Test PyPI, so an unreleased state can be
+installed without a git reference:
 
 ```console
-uv pip install git+https://github.com/edutap-eu/edutap.heidi_api
+uv pip install --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ edutap.heidi_api
 ```
+
+The second index is not optional: Test PyPI does not carry `httpx`, `pydantic` and
+the rest, so a resolver pointed only at it fails on the dependencies rather than on
+this package.
 
 ## Usage
 
@@ -29,9 +38,13 @@ Clone the repository and install it in editable mode with the development
 extras:
 
 ```console
-git clone https://github.com/edutap-eu/edutap.heidi_api
+git clone https://github.com/edutap-collective/edutap.heidi_api
 cd edutap.heidi_api
 make install
 make lint
 make test-local
 ```
+
+## Releasing
+
+See [Release the package](docs/how-to.md#release-the-package).
